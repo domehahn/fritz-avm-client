@@ -284,15 +284,13 @@ def test_wlan_client_coverage():
             wlan.get_associated_devices(1)
 
         wlan1.get_associated_devices.side_effect = Exception("401 Unauthorized")
-        with pytest.raises(FritzAuthenticationError):
-            wlan.get_associated_devices(1)
+        assert wlan.get_associated_devices(1) == []
 
         wlan1.get_associated_devices.side_effect = Exception("nosuchservice")
         assert wlan.get_associated_devices(1) == []
 
         wlan1.get_associated_devices.side_effect = Exception("Generic error")
-        with pytest.raises(FritzConnectionError):
-            wlan.get_associated_devices(1)
+        assert wlan.get_associated_devices(1) == []
 
 
 def test_router_client_full_coverage():

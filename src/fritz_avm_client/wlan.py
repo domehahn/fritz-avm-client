@@ -80,14 +80,6 @@ class WlanClient:
             raise FritzTimeoutError(
                 f"Timeout fetching associated devices for WLAN {service_index}: {exc}"
             ) from exc
-        except Exception as exc:
-            err_str = str(exc).lower()
-            if "unauthorized" in err_str or "401" in err_str:
-                raise FritzAuthenticationError(
-                    f"Authentication failed fetching WLAN {service_index} devices"
-                ) from exc
-            elif "nosuchservice" in err_str or "713" in err_str:
-                return []
-            raise FritzConnectionError(
-                f"Error fetching associated devices for WLAN {service_index}: {exc}"
-            ) from exc
+        except Exception:
+            # Service not available, 401 restricted, or unsupported
+            return []

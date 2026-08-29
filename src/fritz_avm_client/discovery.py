@@ -90,6 +90,11 @@ class MeshDiscovery:
             mac_to_mesh_name: Dict[str, str] = {}
             ap_mac_to_mesh_name: Dict[str, str] = {}
             type_by_mac: Dict[str, Dict[str, bool]] = {}
+            node_mac_to_parent_name: Dict[str, str] = {}
+            node_uid_to_mac: Dict[str, str] = {}
+            node_mac_to_link_speeds: Dict[str, Dict[str, int]] = {}
+            mesh_mac_to_ip: Dict[str, str] = {}
+            device_ip_to_node_uid: Dict[str, str] = {}
 
             if mesh_topology:
                 for node_info in mesh_topology.get("nodes", []):
@@ -125,10 +130,6 @@ class MeshDiscovery:
                         }
 
                 # 3. Build node hierarchy & aggregate link speeds
-                node_mac_to_parent_name: Dict[str, str] = {}
-                node_uid_to_mac: Dict[str, str] = {}
-                node_mac_to_link_speeds: Dict[str, Dict[str, int]] = {}
-
                 for node_info in mesh_topology.get("nodes", []):
                     node_uid = node_info.get("uid", "")
                     mac_addr = node_info.get("device_mac_address", "").upper()
@@ -164,7 +165,6 @@ class MeshDiscovery:
                                 break
 
                 # Extract IP addresses from mesh topology
-                mesh_mac_to_ip: Dict[str, str] = {}
                 for node_info in mesh_topology.get("nodes", []):
                     mac_addr = node_info.get("device_mac_address", "").upper()
                     if mac_addr:
@@ -176,7 +176,6 @@ class MeshDiscovery:
                                     break
 
                 # Map device IP to node UID from mesh topology node_links
-                device_ip_to_node_uid: Dict[str, str] = {}
                 for node_info in mesh_topology.get("nodes", []):
                     device_ip = ""
                     for ip_info in node_info.get("ip_addresses", []):
