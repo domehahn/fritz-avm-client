@@ -1,12 +1,10 @@
 """Unit tests for RouterClient, HostsClient, WlanClient, and CapabilityDetector with mocks."""
-import pytest
 from unittest.mock import MagicMock, patch
 
 from fritz_avm_client.router import RouterClient
 from fritz_avm_client.hosts import HostsClient
 from fritz_avm_client.wlan import WlanClient
 from fritz_avm_client.capabilities import CapabilityDetector
-from fritz_avm_client.exceptions import FritzTimeoutError, FritzConnectionError
 
 
 def test_router_client_get_wan_stats():
@@ -46,40 +44,26 @@ def test_hosts_client():
         mock_hosts.get_hosts_info.return_value = [{'name': 'TV', 'mac': '00:11:22:33:44:55'}]
 
         hosts_client = HostsClient(mock_fc)
-        all_hosts = hosts_client.get_all_hosts()
+        all_hosts = hosts_client.get_hosts_info()
         assert len(all_hosts) == 1
         assert all_hosts[0]['name'] == 'TV'
-
-    mock_fc.call_action.return_value = {
-        'NewX_AVM-DE_RxBytes': 1000,
-        'NewX_AVM-DE_TxBytes': 2000,
-    }
-    stats = hosts_client.get_device_stats('00:11:22:33:44:55')
-    assert stats == {'rx_bytes': 1000, 'tx_bytes': 2000}
 
 
 def test_wlan_client():
     mock_fc = MagicMock()
-    mock_fc.call_action.side_effect = lambda service, action, **kwargs: {
-        'GetStatistics': {'NewTotalPacketsSent': 100, 'NewTotalPacketsReceived': 200},
-        'GetTotalAssociations': {'NewTotalAssociations': 1},
-        'GetInfo': {'NewBSSID': 'AA:BB:CC:DD:EE:00'},
-        'GetGenericAssociatedDeviceInfo': {
-            'NewAssociatedDeviceMACAddress': '11:22:33:44:55:66',
-            'NewAssociatedDeviceIPAddress': '192.168.178.50',
-            'NewX_AVM-DE_SignalStrength': 90,
-            'NewX_AVM-DE_Speed': 300,
-        }
-    }.get(action, {})
+    with patch("fritz_avm_client.wlan.FritzWLAN") as mock_wlan_cls:
+        mock_wlan = mock_wlan_cls.return_value
+        mock_wlan.ssid = "HomeWiFi"
+        mock_wlan.channel = 36
+        mock_wlan.get_associated_devices.return_value = [{'mac': '11:22:33:44:55:66'}]
 
-    wlan_client = WlanClient(mock_fc)
-    traffic = wlan_client.get_wlan_traffic_stats()
-    assert traffic.total_packets_sent == 400  # 4 bands * 100
-    assert traffic.total_packets_received == 800  # 4 bands * 200
+        wlan_client = WlanClient(mock_fc)
+        stats_list = wlan_client.get_wlan_stats()
+        assert len(stats_list) >= 1
+        assert stats_list[0].ssid == "HomeWiFi"
 
-    devices = wlan_client.get_wlan_devices()
-    assert len(devices) == 4
-    assert devices[0]['device_mac'] == '11:22:33:44:55:66'
+        devices = wlan_client.get_associated_devices(1)
+        assert len(devices) == 1
 
 
 def test_capability_detector():

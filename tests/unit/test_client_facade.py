@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from fritz_avm_client import FritzClient, Settings
-from fritz_avm_client.exceptions import FritzTimeoutError, FritzConnectionError, FritzAuthenticationError
+from fritz_avm_client.exceptions import FritzTimeoutError, FritzAuthenticationError
 
 
 def test_fritz_client_init_success():

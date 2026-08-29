@@ -1,4 +1,5 @@
 """Basic tests for fritz-avm-client."""
+import os
 import pytest
 from fritz_avm_client import Settings, FritzClient
 from fritz_avm_client.models import Node, Device
@@ -61,20 +62,17 @@ def test_device_model():
         name="iPhone",
         mac="11:22:33:44:55:66",
         ip="192.168.178.100",
-        online=True,
-        interface_type="wlan",
-        connected_node="Living Room Repeater",
-        rx_bytes_total=1024000,
-        tx_bytes_total=512000
+        is_active=True,
+        connection_type="wlan",
+        connected_to="Living Room Repeater",
+        rx_bytes=1024000,
+        tx_bytes=512000
     )
 
     assert device.name == "iPhone"
-    assert device.online is True
-    assert device.interface_type == "wlan"
-    assert device.rx_bytes_total == 1024000
-
-
-import os
+    assert device.is_active is True
+    assert device.connection_type == "wlan"
+    assert device.rx_bytes == 1024000
 
 
 @pytest.mark.skipif(not os.getenv("FRITZ_INTEGRATION_TESTS"), reason="FRITZ_INTEGRATION_TESTS=1 not set")

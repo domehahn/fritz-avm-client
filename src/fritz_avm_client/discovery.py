@@ -1,4 +1,5 @@
 """Mesh network discovery for Fritz!Box."""
+from __future__ import annotations
 from dataclasses import replace
 from typing import List, Tuple, Dict, Any, Optional, TYPE_CHECKING
 from .models import Node, Device
@@ -255,16 +256,16 @@ class MeshDiscovery:
                     ip_to_host_info[ip] = {'name': name, 'mac': mac}
 
             for mesh_name, mac_addr in mesh_name_to_mac.items():
-                unique_name = mesh_name_to_unique_name.get(mesh_name)
-                if unique_name:
-                    mac_to_unique_name[mac_addr] = unique_name
+                if mesh_name in mesh_name_to_unique_name:
+                    mac_to_unique_name[mac_addr] = mesh_name_to_unique_name[mesh_name]
 
             for host in all_hosts:
                 mac = host.get('mac', '').upper()
                 name = host.get('name', '')
-                unique_name = mesh_name_to_unique_name.get(name)
-                if mac and unique_name and mac not in mac_to_unique_name:
-                    mac_to_unique_name[mac] = unique_name
+                if name in mesh_name_to_unique_name:
+                    unique_name = mesh_name_to_unique_name[name]
+                    if mac and unique_name and mac not in mac_to_unique_name:
+                        mac_to_unique_name[mac] = unique_name
 
             if mesh_topology:
                 for node_info in mesh_topology.get('nodes', []):
@@ -426,35 +427,37 @@ class MeshDiscovery:
                 )
 
                 if is_router or is_repeater or is_powerline:
-                    unique_name = mac_to_unique_name.get(mesh_mac_for_host)
-                    if not unique_name:
+                    resolved_unique_name: Optional[str] = mac_to_unique_name.get(mesh_mac_for_host or '')
+                    if not resolved_unique_name:
                         if is_router:
-                            unique_name = "fritz.box"
+                            resolved_unique_name = "fritz.box"
                         elif is_repeater:
-                            mac_suffix = mesh_mac_for_host.replace(':', '')[-4:]
-                            unique_name = f"Repeater-{mac_suffix}"
+                            mac_suffix = (mesh_mac_for_host or '').replace(':', '')[-4:]
+                            resolved_unique_name = f"Repeater-{mac_suffix}"
                         elif is_powerline:
-                            mac_suffix = mesh_mac_for_host.replace(':', '')[-4:]
-                            unique_name = f"Powerline-{mac_suffix}"
+                            mac_suffix = (mesh_mac_for_host or '').replace(':', '')[-4:]
+                            resolved_unique_name = f"Powerline-{mac_suffix}"
 
-                    mesh_name = mac_to_mesh_name.get(mesh_mac_for_host)
+                    mesh_name = mac_to_mesh_name.get(mesh_mac_for_host or '')
                     model_display_name = self.model_name_mapping.get(mesh_name or name, name)
-                    parent_uid = node_mac_to_parent_name.get(mesh_mac_for_host)
+                    parent_uid = node_mac_to_parent_name.get(mesh_mac_for_host or '')
                     link_speeds = node_mac_to_link_speeds.get(
-                        mesh_mac_for_host, {'rx_kbps': 0, 'tx_kbps': 0}
+                        mesh_mac_for_host or '', {'rx_kbps': 0, 'tx_kbps': 0}
                     )
 
-                    if mesh_mac_for_host in nodes_by_mac:
-                        node = nodes_by_mac[mesh_mac_for_host]
-                        node.ip = ip
-                        node.extra['active'] = active
-                        node.extra['model'] = model_display_name
-                        node.extra['parent_uid'] = parent_uid
-                        node.extra['link_rx_kbps'] = link_speeds['rx_kbps']
-                        node.extra['link_tx_kbps'] = link_speeds['tx_kbps']
+                    if mesh_mac_for_host and mesh_mac_for_host in nodes_by_mac:
+                        existing_node = nodes_by_mac[mesh_mac_for_host]
+                        new_extra = dict(existing_node.extra)
+                        new_extra['active'] = active
+                        new_extra['model'] = model_display_name
+                        new_extra['parent_uid'] = parent_uid
+                        new_extra['link_rx_kbps'] = link_speeds['rx_kbps']
+                        new_extra['link_tx_kbps'] = link_speeds['tx_kbps']
+                        updated_node = replace(existing_node, ip=ip, extra=new_extra)
+                        nodes_by_mac[mesh_mac_for_host] = updated_node
                     else:
                         node = Node(
-                            name=unique_name,
+                            name=resolved_unique_name or "fritz.box",
                             mac=mac,
                             ip=ip,
                             is_router=is_router,
@@ -470,10 +473,11 @@ class MeshDiscovery:
                             },
                             parent_node=None,
                         )
-                        nodes_by_mac[mesh_mac_for_host] = node
+                        if mesh_mac_for_host:
+                            nodes_by_mac[mesh_mac_for_host] = node
                 else:
-                    connected_node_mesh_name = None
-                    connected_node_uid = None
+                    connected_node_mesh_name: Optional[str] = None
+                    connected_node_uid: Optional[str] = None
                     mapping_source = "none"
 
                     mac_upper = (mac or '').upper()
@@ -497,12 +501,13 @@ class MeshDiscovery:
                         mapping_source = "default_router"
 
                     if mapping_source == "static_ip_override":
-                        connected_node = connected_node_mesh_name
+                        connected_node = connected_node_mesh_name or "fritz.box"
                     elif mapping_source == "mesh_ip":
-                        connected_node = uid_to_unique_name.get(connected_node_uid, 'fritz.box')
+                        connected_node = uid_to_unique_name.get(connected_node_uid or '', 'fritz.box')
                     else:
+                        connected_node_key = connected_node_mesh_name or "fritz.box"
                         connected_node = mesh_name_to_unique_name.get(
-                            connected_node_mesh_name, connected_node_mesh_name
+                            connected_node_key, connected_node_key
                         )
 
                     traffic_stats = (
@@ -521,11 +526,11 @@ class MeshDiscovery:
                         name=name,
                         mac=mac,
                         ip=ip or None,
-                        online=active,
-                        interface_type=interface_type,
-                        connected_node=connected_node,
-                        rx_bytes_total=traffic_stats.get('rx_bytes', 0),
-                        tx_bytes_total=traffic_stats.get('tx_bytes', 0),
+                        is_active=active,
+                        connection_type=interface_type,
+                        connected_to=connected_node,
+                        rx_bytes=traffic_stats.get('rx_bytes', 0),
+                        tx_bytes=traffic_stats.get('tx_bytes', 0),
                         extra=extra_data,
                     )
                     devices.append(device)

@@ -1,15 +1,16 @@
 """Router client for WAN stats, DSL quality, and CPU temperatures."""
-from typing import Dict, Any, Optional
+from __future__ import annotations
+from typing import Dict, Optional, Any
 from fritzconnection.lib.fritzstatus import FritzStatus
 
 from .models import WanStats, DslStats
-from .exceptions import FritzConnectionError, FritzTimeoutError, FritzAuthenticationError, FritzProtocolError
+from .exceptions import FritzConnectionError, FritzTimeoutError
 
 
 class RouterClient:
     """Handles WAN status, DSL line quality, and CPU temperatures."""
 
-    def __init__(self, fc) -> None:
+    def __init__(self, fc: Any) -> None:
         self.fc = fc
         self._status: Optional[FritzStatus] = None
 
@@ -79,4 +80,3 @@ class RouterClient:
             raise FritzTimeoutError(f"Timeout fetching WAN stats: {exc}") from exc
         except Exception as exc:
             raise FritzConnectionError(f"Error fetching WAN stats: {exc}") from exc
-

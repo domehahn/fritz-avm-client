@@ -1,6 +1,7 @@
 """Capabilities detection and caching for Fritz!Box devices."""
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 
 
 @dataclass(frozen=True)
@@ -16,10 +17,10 @@ class FritzCapabilities:
 class CapabilityDetector:
     """Detects and caches Fritz!Box capabilities."""
 
-    def __init__(self, fc=None) -> None:
+    def __init__(self, fc: Any = None) -> None:
         self._cached_capabilities: Optional[FritzCapabilities] = None
 
-    def detect(self, fc) -> FritzCapabilities:
+    def detect(self, fc: Any) -> FritzCapabilities:
         """Detect capabilities from FritzConnection instance."""
         if self._cached_capabilities is not None:
             return self._cached_capabilities
@@ -64,4 +65,3 @@ class CapabilityDetector:
         )
         self._cached_capabilities = caps
         return caps
-

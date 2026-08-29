@@ -1,7 +1,6 @@
 """Contract tests using anonymized TR-064 response fixtures."""
-import pytest
 from unittest.mock import MagicMock
-from fritz_avm_client import FritzClient, Settings, MeshDiscovery
+from fritz_avm_client import FritzClient, MeshDiscovery
 
 ANONYMIZED_MESH_TOPOLOGY = {
     'nodes': [
@@ -90,7 +89,6 @@ ANONYMIZED_WLAN_DEVICES = [
 
 def test_contract_mesh_discovery_parsing():
     """Verify mesh topology discovery using contract response fixtures."""
-    mock_fc = MagicMock()
     client = MagicMock(spec=FritzClient)
     client.get_wlan_devices.return_value = ANONYMIZED_WLAN_DEVICES
     client.get_mesh_info.return_value = ANONYMIZED_MESH_TOPOLOGY
@@ -112,5 +110,5 @@ def test_contract_mesh_discovery_parsing():
     client_dev = devices[0]
     assert client_dev.name == 'ClientLaptop'
     assert client_dev.mac == 'AA:BB:CC:11:22:33'
-    assert client_dev.connected_node == repeater_nodes[0].name
+    assert client_dev.connected_to == repeater_nodes[0].name
 

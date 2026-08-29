@@ -1,4 +1,5 @@
 """Typed domain models for Fritz!Box mesh topology, WAN stats, and devices."""
+from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Tuple
 
@@ -39,6 +40,10 @@ class WlanStats:
     """Aggregated WiFi interface statistics."""
     total_packets_sent: int = 0
     total_packets_received: int = 0
+    service_index: int = 1
+    ssid: Optional[str] = None
+    channel: Optional[int] = None
+    connected_clients: int = 0
 
 
 @dataclass(frozen=True)
@@ -60,16 +65,16 @@ class Device:
     name: str
     mac: str
     ip: Optional[str] = None
-    online: bool = False
-    interface_type: Optional[str] = None
-    connected_node: Optional[str] = None
-    rx_bytes_total: Optional[int] = None
-    tx_bytes_total: Optional[int] = None
+    connected_to: Optional[str] = None
+    connection_type: Optional[str] = None
+    is_active: bool = False
+    rx_bytes: int = 0
+    tx_bytes: int = 0
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class MeshTopology:
-    """Complete mesh network topology with nodes and devices."""
+    """Complete mesh network topology snapshot."""
     nodes: Tuple[Node, ...] = field(default_factory=tuple)
     devices: Tuple[Device, ...] = field(default_factory=tuple)

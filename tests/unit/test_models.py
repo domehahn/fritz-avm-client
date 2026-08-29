@@ -1,6 +1,6 @@
 """Unit tests for domain models."""
 import pytest
-from fritz_avm_client.models import WanStats, DslStats, Node, Device, MeshTopology
+from fritz_avm_client.models import WanStats, Node, Device, MeshTopology
 
 
 def test_wan_stats_immutability():
@@ -24,7 +24,7 @@ def test_node_model():
 
 def test_mesh_topology_model():
     node = Node(name="Router", mac="11:22:33:44:55:66", is_router=True)
-    device = Device(name="Phone", mac="AA:11:22:33:44:55", online=True)
+    device = Device(name="Phone", mac="AA:11:22:33:44:55", is_active=True)
     topology = MeshTopology(nodes=(node,), devices=(device,))
     assert len(topology.nodes) == 1
     assert len(topology.devices) == 1

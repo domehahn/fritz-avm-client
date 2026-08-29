@@ -1,5 +1,6 @@
-"""WLAN client for interface stats and device AP associations."""
-from typing import List, Dict, Any, Optional
+"""WLAN client for wireless access point and associated station statistics."""
+from __future__ import annotations
+from typing import List, Dict, Any, cast
 from fritzconnection.lib.fritzwlan import FritzWLAN
 
 from .models import WlanStats
@@ -7,79 +8,45 @@ from .exceptions import FritzConnectionError, FritzTimeoutError
 
 
 class WlanClient:
-    """Handles WLAN statistics and client AP mappings."""
+    """Handles WLAN configuration, SSIDs, and connected station statistics."""
 
-    def __init__(self, fc) -> None:
+    def __init__(self, fc: Any) -> None:
         self.fc = fc
-        self._wlan: Optional[FritzWLAN] = None
 
-    @property
-    def wlan(self) -> FritzWLAN:
-        if self._wlan is None:
-            self._wlan = FritzWLAN(self.fc)
-        return self._wlan
-
-    def get_wlan_traffic_stats(self) -> WlanStats:
-        """Get aggregated WiFi interface traffic statistics across all bands."""
-        total_sent = 0
-        total_received = 0
+    def get_wlan_stats(self) -> List[WlanStats]:
+        """Get WLAN statistics across all available radio bands (2.4GHz, 5GHz, 6GHz)."""
+        stats_list: List[WlanStats] = []
         try:
-            for service_id in range(1, 5):
+            # Query up to 4 potential WLAN instances
+            for i in range(1, 5):
                 try:
-                    service_name = f'WLANConfiguration{service_id}'
-                    result = self.fc.call_action(service_name, 'GetStatistics')
-                    total_sent += result.get('NewTotalPacketsSent', 0) or 0
-                    total_received += result.get('NewTotalPacketsReceived', 0) or 0
+                    wlan = FritzWLAN(self.fc, service=i)
+                    ssid = getattr(wlan, 'ssid', None)
+                    channel = getattr(wlan, 'channel', None)
+                    num_clients = len(wlan.get_associated_devices()) if hasattr(wlan, 'get_associated_devices') else 0
+                    stats_list.append(
+                        WlanStats(
+                            service_index=i,
+                            ssid=ssid,
+                            channel=channel,
+                            connected_clients=num_clients,
+                        )
+                    )
                 except Exception:
-                    continue
+                    # Service instance i does not exist or is inactive
+                    break
         except TimeoutError as exc:
             raise FritzTimeoutError(f"Timeout fetching WLAN stats: {exc}") from exc
         except Exception as exc:
             raise FritzConnectionError(f"Error fetching WLAN stats: {exc}") from exc
 
-        return WlanStats(
-            total_packets_sent=total_sent,
-            total_packets_received=total_received,
-        )
+        return stats_list
 
-    def get_wlan_devices(self) -> List[Dict[str, Any]]:
-        """Get all devices connected via WLAN with associated AP MAC."""
-        wlan_devices = []
+    def get_associated_devices(self, service_index: int = 1) -> List[Dict[str, Any]]:
+        """Get list of associated wireless stations for a given WLAN service index."""
         try:
-            for service_id in range(1, 5):
-                try:
-                    service_name = f'WLANConfiguration{service_id}'
-                    result = self.fc.call_action(service_name, 'GetTotalAssociations')
-                    total = result.get('NewTotalAssociations', 0) or 0
-
-                    bssid_result = self.fc.call_action(service_name, 'GetInfo')
-                    ap_mac = bssid_result.get('NewBSSID', '')
-
-                    for i in range(total):
-                        try:
-                            device_info = self.fc.call_action(
-                                service_name,
-                                'GetGenericAssociatedDeviceInfo',
-                                NewAssociatedDeviceIndex=i
-                            )
-                            device_mac = device_info.get('NewAssociatedDeviceMACAddress', '')
-                            if device_mac:
-                                wlan_devices.append({
-                                    'device_mac': device_mac,
-                                    'ap_mac': ap_mac,
-                                    'service': service_name,
-                                    'ip': device_info.get('NewAssociatedDeviceIPAddress', ''),
-                                    'signal_strength': device_info.get('NewX_AVM-DE_SignalStrength', 0),
-                                    'speed': device_info.get('NewX_AVM-DE_Speed', 0),
-                                })
-                        except Exception:
-                            continue
-                except Exception:
-                    continue
-        except TimeoutError as exc:
-            raise FritzTimeoutError(f"Timeout fetching WLAN devices: {exc}") from exc
-        except Exception as exc:
-            raise FritzConnectionError(f"Error fetching WLAN devices: {exc}") from exc
-
-        return wlan_devices
-
+            wlan = FritzWLAN(self.fc, service=service_index)
+            devices = wlan.get_associated_devices()
+            return cast(List[Dict[str, Any]], devices)
+        except Exception:
+            return []

@@ -1,14 +1,15 @@
-"""Hosts client for device queries and host entries."""
-from typing import List, Dict, Any, Optional
+"""Hosts client for host list and per-host traffic stats."""
+from __future__ import annotations
+from typing import List, Dict, Optional, Any, cast
 from fritzconnection.lib.fritzhosts import FritzHosts
 
 from .exceptions import FritzConnectionError, FritzTimeoutError
 
 
 class HostsClient:
-    """Handles host entries, device lookup, and MAC traffic queries."""
+    """Handles FRITZ!Box host management and device query operations."""
 
-    def __init__(self, fc) -> None:
+    def __init__(self, fc: Any) -> None:
         self.fc = fc
         self._hosts: Optional[FritzHosts] = None
 
@@ -18,29 +19,28 @@ class HostsClient:
             self._hosts = FritzHosts(self.fc)
         return self._hosts
 
-    def get_all_hosts(self) -> List[Dict[str, Any]]:
-        """Get all host entries from Fritz!Box."""
+    def get_hosts_info(self) -> List[Dict[str, Any]]:
+        """Get list of all host entries from FRITZ!Box."""
         try:
-            return self.hosts.get_hosts_info()
+            res = self.hosts.get_hosts_info()
+            return cast(List[Dict[str, Any]], res)
         except TimeoutError as exc:
-            raise FritzTimeoutError(f"Timeout fetching hosts: {exc}") from exc
+            raise FritzTimeoutError(f"Timeout fetching hosts info: {exc}") from exc
         except Exception as exc:
-            raise FritzConnectionError(f"Error fetching hosts: {exc}") from exc
+            raise FritzConnectionError(f"Error fetching hosts info: {exc}") from exc
 
-    def get_device_stats(self, mac_address: str) -> Dict[str, int]:
-        """Get traffic statistics for a specific MAC address."""
-        if not mac_address:
-            return {'rx_bytes': 0, 'tx_bytes': 0}
+    def get_host_details(self, index: int) -> Dict[str, Any]:
+        """Get detailed host info by index."""
         try:
-            result = self.fc.call_action(
-                'Hosts1',
-                'GetSpecificHostEntry',
-                NewMACAddress=mac_address
-            )
-            return {
-                'rx_bytes': result.get('NewX_AVM-DE_RxBytes', 0) or 0,
-                'tx_bytes': result.get('NewX_AVM-DE_TxBytes', 0) or 0,
-            }
+            res = self.hosts.get_generic_host_entry(index)
+            return cast(Dict[str, Any], res)
         except Exception:
-            return {'rx_bytes': 0, 'tx_bytes': 0}
+            return {}
 
+    def get_host_number(self) -> int:
+        """Get count of registered hosts."""
+        try:
+            num = self.hosts.host_number
+            return int(num)
+        except Exception:
+            return 0
