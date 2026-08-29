@@ -63,36 +63,29 @@ class RouterClient:
 
     def get_wan_stats(self) -> WanStats:
         """Get WAN connection statistics and real-time rates."""
+
+        def _safe_attr(attr_name: str) -> Any:
+            try:
+                return getattr(self.status, attr_name, None)
+            except Exception:
+                return None
+
         try:
             bytes_received = self.status.bytes_received
             bytes_sent = self.status.bytes_sent
             current_rates = self.status.transmission_rate
             is_connected = self.status.is_connected
 
-            max_byte_rate = getattr(self.status, "max_byte_rate", None)
+            max_byte_rate = _safe_attr("max_byte_rate")
             max_down = max_byte_rate[0] if max_byte_rate else None
             max_up = max_byte_rate[1] if max_byte_rate and len(max_byte_rate) > 1 else None
 
             down_rate = current_rates[0] if current_rates else None
             up_rate = current_rates[1] if current_rates and len(current_rates) > 1 else None
 
-            device_uptime = None
-            try:
-                device_uptime = getattr(self.status, "device_uptime", None)
-            except Exception:
-                pass
-
-            connection_uptime = None
-            try:
-                connection_uptime = getattr(self.status, "connection_uptime", None)
-            except Exception:
-                pass
-
-            external_ip = None
-            try:
-                external_ip = getattr(self.status, "external_ip", None)
-            except Exception:
-                pass
+            device_uptime = _safe_attr("device_uptime")
+            connection_uptime = _safe_attr("connection_uptime")
+            external_ip = _safe_attr("external_ip")
 
             return WanStats(
                 total_bytes_received=bytes_received,
@@ -103,7 +96,7 @@ class RouterClient:
                 max_upstream_rate=max_up,
                 device_uptime=device_uptime,
                 connection_uptime=connection_uptime,
-                external_ip=external_ip or None,
+                external_ip=str(external_ip) if external_ip else None,
                 is_connected=is_connected,
                 cpu_temperatures=self.get_cpu_temperatures(),
             )
