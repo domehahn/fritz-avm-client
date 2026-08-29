@@ -337,9 +337,11 @@ def test_router_client_full_coverage():
     mock_status2.uptime = 3600
     mock_status2.connection_uptime = 1800
     mock_status2.external_ip_address = "1.1.1.1"
-    mock_status2.is_connected = True
-    wan = router.get_wan_stats()
-    assert wan.total_bytes_received == 1000
+    type(mock_status2).device_uptime = PropertyMock(side_effect=Exception("error"))
+    type(mock_status2).connection_uptime = PropertyMock(side_effect=Exception("error"))
+    type(mock_status2).external_ip = PropertyMock(side_effect=Exception("error"))
+    wan_opt = router.get_wan_stats()
+    assert wan_opt.total_bytes_received == 1000
 
     type(mock_status2).bytes_received = PropertyMock(side_effect=TimeoutError("Timeout"))
     with pytest.raises(FritzTimeoutError):
