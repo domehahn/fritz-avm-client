@@ -23,10 +23,15 @@ class WlanClient:
                     wlan = FritzWLAN(self.fc, service=i)
                     ssid = getattr(wlan, "ssid", None)
                     channel = getattr(wlan, "channel", None)
-                    num_clients = (
-                        len(wlan.get_associated_devices())
+                    devices = (
+                        wlan.get_associated_devices()
                         if hasattr(wlan, "get_associated_devices")
-                        else 0
+                        else (wlan.get_hosts_info() if hasattr(wlan, "get_hosts_info") else [])
+                    )
+                    num_clients = (
+                        len(devices)
+                        if devices is not None
+                        else (getattr(wlan, "total_host_number", 0) or 0)
                     )
                     stats_list.append(
                         WlanStats(
@@ -65,7 +70,11 @@ class WlanClient:
         """Get list of associated wireless stations for a given WLAN service index."""
         try:
             wlan = FritzWLAN(self.fc, service=service_index)
-            devices = wlan.get_associated_devices()
+            devices = (
+                wlan.get_associated_devices()
+                if hasattr(wlan, "get_associated_devices")
+                else (wlan.get_hosts_info() if hasattr(wlan, "get_hosts_info") else [])
+            )
             return cast(List[Dict[str, Any]], devices)
         except TimeoutError as exc:
             raise FritzTimeoutError(
