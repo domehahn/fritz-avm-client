@@ -7,6 +7,7 @@ from typing import Optional, Any
 @dataclass(frozen=True)
 class FritzCapabilities:
     """Represents supported features and metrics of a Fritz!Box device."""
+
     mesh: bool = False
     cpu_temperature: bool = False
     dsl_metrics: bool = False
@@ -32,28 +33,32 @@ class CapabilityDetector:
         host_traffic = False
 
         if fc is not None:
-            services = getattr(fc, 'services', {})
+            services = getattr(fc, "services", {})
             # Mesh support
-            if 'Hosts1' in services and hasattr(fc, 'call_action'):
+            if "Hosts1" in services and hasattr(fc, "call_action"):
                 mesh = True
 
             # CPU Temperature (Status service check)
             try:
-                if hasattr(fc, 'call_action') and 'DeviceInfo1' in services:
+                if hasattr(fc, "call_action") and "DeviceInfo1" in services:
                     cpu_temp = True
             except Exception:
                 cpu_temp = False
 
             # DSL Metrics
-            if 'WANIPConnection1' in services or 'WANPPPConnection1' in services or 'WANDSLInterfaceConfig1' in services:
+            if (
+                "WANIPConnection1" in services
+                or "WANPPPConnection1" in services
+                or "WANDSLInterfaceConfig1" in services
+            ):
                 dsl = True
 
             # WLAN Statistics
-            if 'WLANConfiguration1' in services:
+            if "WLANConfiguration1" in services:
                 wlan = True
 
             # Host Traffic Statistics
-            if 'Hosts1' in services:
+            if "Hosts1" in services:
                 host_traffic = True
 
         caps = FritzCapabilities(

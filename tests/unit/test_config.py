@@ -23,10 +23,7 @@ def test_settings_password_file(tmp_path):
     secret_file = tmp_path / "fritz_pass.txt"
     secret_file.write_text("file_password_123\n")
 
-    settings = Settings(
-        fritz_password="direct_password",
-        fritz_password_file=str(secret_file)
-    )
+    settings = Settings(fritz_password="direct_password", fritz_password_file=str(secret_file))
     # File should take priority over direct password
     assert settings.resolved_password == "file_password_123"
 
@@ -35,4 +32,3 @@ def test_settings_password_file_missing():
     settings = Settings(fritz_password_file="/path/does/not/exist/pass.txt")
     with pytest.raises(FritzConfigurationError):
         _ = settings.resolved_password
-

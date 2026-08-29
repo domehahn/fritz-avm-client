@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Dict, Optional, Any, cast
 from fritzconnection.lib.fritzhosts import FritzHosts
 
-from .exceptions import FritzConnectionError, FritzTimeoutError
+from .exceptions import FritzConnectionError, FritzTimeoutError, FritzAuthenticationError
 
 
 class HostsClient:
@@ -24,6 +24,8 @@ class HostsClient:
         try:
             res = self.hosts.get_hosts_info()
             return cast(List[Dict[str, Any]], res)
+        except (FritzTimeoutError, FritzAuthenticationError):
+            raise
         except TimeoutError as exc:
             raise FritzTimeoutError(f"Timeout fetching hosts info: {exc}") from exc
         except Exception as exc:
@@ -34,13 +36,27 @@ class HostsClient:
         try:
             res = self.hosts.get_generic_host_entry(index)
             return cast(Dict[str, Any], res)
-        except Exception:
-            return {}
+        except TimeoutError as exc:
+            raise FritzTimeoutError(f"Timeout fetching host entry {index}: {exc}") from exc
+        except Exception as exc:
+            err_str = str(exc).lower()
+            if "unauthorized" in err_str or "401" in err_str:
+                raise FritzAuthenticationError(
+                    "Authentication failed fetching host details"
+                ) from exc
+            elif "invalid" in err_str or "index" in err_str:
+                return {}
+            raise FritzConnectionError(f"Error fetching host entry {index}: {exc}") from exc
 
     def get_host_number(self) -> int:
         """Get count of registered hosts."""
         try:
             num = self.hosts.host_number
             return int(num)
-        except Exception:
-            return 0
+        except TimeoutError as exc:
+            raise FritzTimeoutError(f"Timeout fetching host count: {exc}") from exc
+        except Exception as exc:
+            err_str = str(exc).lower()
+            if "unauthorized" in err_str or "401" in err_str:
+                raise FritzAuthenticationError("Authentication failed fetching host count") from exc
+            raise FritzConnectionError(f"Error fetching host count: {exc}") from exc

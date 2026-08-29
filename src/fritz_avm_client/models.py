@@ -7,12 +7,14 @@ from typing import Optional, Dict, Any, Tuple
 @dataclass(frozen=True)
 class CpuTemperature:
     """Represents CPU temperature readings."""
+
     temperatures: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class WanStats:
     """WAN connection statistics and real-time rates."""
+
     total_bytes_received: Optional[int] = None
     total_bytes_sent: Optional[int] = None
     current_download_rate: Optional[int] = None
@@ -29,6 +31,7 @@ class WanStats:
 @dataclass(frozen=True)
 class DslStats:
     """DSL line quality metrics."""
+
     downstream_attenuation: Optional[float] = None
     upstream_attenuation: Optional[float] = None
     downstream_noise_margin: Optional[float] = None
@@ -38,6 +41,7 @@ class DslStats:
 @dataclass(frozen=True)
 class WlanStats:
     """Aggregated WiFi interface statistics."""
+
     total_packets_sent: int = 0
     total_packets_received: int = 0
     service_index: int = 1
@@ -49,6 +53,7 @@ class WlanStats:
 @dataclass(frozen=True)
 class Node:
     """Represents a Fritz! device in the mesh (router, repeater, powerline)."""
+
     name: str
     mac: str
     ip: Optional[str] = None
@@ -62,6 +67,7 @@ class Node:
 @dataclass(frozen=True)
 class Device:
     """Represents a client device (phone, TV, computer, etc.)."""
+
     name: str
     mac: str
     ip: Optional[str] = None
@@ -76,5 +82,6 @@ class Device:
 @dataclass(frozen=True)
 class MeshTopology:
     """Complete mesh network topology snapshot."""
+
     nodes: Tuple[Node, ...] = field(default_factory=tuple)
     devices: Tuple[Device, ...] = field(default_factory=tuple)

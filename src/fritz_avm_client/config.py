@@ -20,11 +20,9 @@ class Settings(BaseSettings):
         fritz_use_tls: Use TLS for TR-064 connection (default: False)
         fritz_timeout: Connection and read timeout in seconds (default: 5.0)
     """
+
     model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=False,
-        env_prefix="",
-        extra="ignore"
+        env_file=".env", case_sensitive=False, env_prefix="", extra="ignore"
     )
 
     fritz_host: str = Field(default="192.168.178.1")
@@ -42,10 +40,12 @@ class Settings(BaseSettings):
             path = self.fritz_password_file.strip()
             if os.path.exists(path):
                 try:
-                    with open(path, 'r', encoding='utf-8') as f:
+                    with open(path, "r", encoding="utf-8") as f:
                         return f.read().strip()
                 except Exception as exc:
-                    raise FritzConfigurationError(f"Failed to read password from file '{path}': {exc}") from exc
+                    raise FritzConfigurationError(
+                        f"Failed to read password from file '{path}': {exc}"
+                    ) from exc
             else:
                 raise FritzConfigurationError(f"Password file '{path}' does not exist")
         return self.fritz_password

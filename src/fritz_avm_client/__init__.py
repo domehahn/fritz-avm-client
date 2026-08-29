@@ -1,4 +1,5 @@
 """Fritz!Box AVM Client Package."""
+from __future__ import annotations
 from .config import Settings
 from .capabilities import FritzCapabilities, CapabilityDetector
 from .exceptions import (
@@ -23,6 +24,7 @@ from .models import (
 from .router import RouterClient
 from .hosts import HostsClient
 from .wlan import WlanClient
+from .admin import AdminClient
 from .mesh import MeshDiscovery
 from .client import FritzClient
 
@@ -48,6 +50,7 @@ __all__ = [
     "RouterClient",
     "HostsClient",
     "WlanClient",
+    "AdminClient",
     "MeshDiscovery",
     "FritzClient",
 ]

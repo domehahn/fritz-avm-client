@@ -27,4 +27,3 @@ def test_exception_raising():
     """Verify raising and catching base FritzError."""
     with pytest.raises(FritzError):
         raise FritzTimeoutError("Connection timed out")
-

@@ -17,12 +17,14 @@ def test_fritz_client_init_success():
             user=None,
             password="password123",
             timeout=5.0,
-            use_tls=False
+            use_tls=False,
         )
 
 
 def test_fritz_client_init_auth_failure():
-    with patch("fritz_avm_client.client.FritzConnection", side_effect=Exception("401 Unauthorized")):
+    with patch(
+        "fritz_avm_client.client.FritzConnection", side_effect=Exception("401 Unauthorized")
+    ):
         settings = Settings(fritz_username="admin", fritz_password="wrong")
         with pytest.raises(FritzAuthenticationError):
             FritzClient(settings)
@@ -50,4 +52,3 @@ def test_execute_with_retry_exhausted():
         with pytest.raises(FritzTimeoutError):
             client._execute_with_retry(mock_func, max_retries=1, initial_backoff=0.01)
         assert mock_func.call_count == 2
-

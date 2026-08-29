@@ -16,10 +16,7 @@ def test_settings_defaults():
 def test_settings_custom():
     """Test Settings with custom values."""
     settings = Settings(
-        fritz_host="192.168.1.1",
-        fritz_port=12345,
-        fritz_username="admin",
-        fritz_password="secret"
+        fritz_host="192.168.1.1", fritz_port=12345, fritz_username="admin", fritz_password="secret"
     )
     assert settings.fritz_host == "192.168.1.1"
     assert settings.fritz_port == 12345
@@ -45,8 +42,8 @@ def test_node_model():
         is_router=False,
         is_repeater=True,
         is_powerline=False,
-        extra={'model': 'FRITZ!Repeater 6000'},
-        parent_node="Router"
+        extra={"model": "FRITZ!Repeater 6000"},
+        parent_node="Router",
     )
 
     assert node.name == "Living Room Repeater"
@@ -66,7 +63,7 @@ def test_device_model():
         connection_type="wlan",
         connected_to="Living Room Repeater",
         rx_bytes=1024000,
-        tx_bytes=512000
+        tx_bytes=512000,
     )
 
     assert device.name == "iPhone"
@@ -75,7 +72,9 @@ def test_device_model():
     assert device.rx_bytes == 1024000
 
 
-@pytest.mark.skipif(not os.getenv("FRITZ_INTEGRATION_TESTS"), reason="FRITZ_INTEGRATION_TESTS=1 not set")
+@pytest.mark.skipif(
+    not os.getenv("FRITZ_INTEGRATION_TESTS"), reason="FRITZ_INTEGRATION_TESTS=1 not set"
+)
 @pytest.mark.integration
 def test_client_initialization():
     """Test FritzClient initialization (requires Fritz!Box)."""
@@ -84,24 +83,27 @@ def test_client_initialization():
     assert client.fc is not None
 
 
-@pytest.mark.skipif(not os.getenv("FRITZ_INTEGRATION_TESTS"), reason="FRITZ_INTEGRATION_TESTS=1 not set")
+@pytest.mark.skipif(
+    not os.getenv("FRITZ_INTEGRATION_TESTS"), reason="FRITZ_INTEGRATION_TESTS=1 not set"
+)
 @pytest.mark.integration
 def test_get_wan_stats():
     """Test getting WAN statistics (requires Fritz!Box)."""
     settings = Settings()
     client = FritzClient(settings)
     wan_stats = client.get_wan_stats()
-    assert 'bytes_sent' in wan_stats
+    assert "bytes_sent" in wan_stats
 
 
 def test_mesh_discovery_initialization():
     """Test MeshDiscovery initialization with optional overrides."""
     from fritz_avm_client import MeshDiscovery
+
     discovery = MeshDiscovery(
         client=None,
         static_mappings={"192.168.178.50": "Repeater-1"},
         manual_hierarchy={"AA:BB:CC:DD:EE:FF": "fritz.box"},
-        model_name_mapping={"FRITZ!Repeater 6000": "Wohnzimmer"}
+        model_name_mapping={"FRITZ!Repeater 6000": "Wohnzimmer"},
     )
     assert discovery.static_mappings == {"192.168.178.50": "Repeater-1"}
     assert discovery.manual_hierarchy == {"AA:BB:CC:DD:EE:FF": "fritz.box"}
@@ -109,4 +111,3 @@ def test_mesh_discovery_initialization():
     nodes, devices = discovery.discover()
     assert nodes == []
     assert devices == []
-

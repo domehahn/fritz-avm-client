@@ -11,12 +11,7 @@ def test_wan_stats_immutability():
 
 
 def test_node_model():
-    node = Node(
-        name="Repeater-1",
-        mac="AA:BB:CC:DD:EE:FF",
-        ip="192.168.178.50",
-        is_repeater=True
-    )
+    node = Node(name="Repeater-1", mac="AA:BB:CC:DD:EE:FF", ip="192.168.178.50", is_repeater=True)
     assert node.name == "Repeater-1"
     assert node.is_repeater is True
     assert node.is_router is False
@@ -28,4 +23,3 @@ def test_mesh_topology_model():
     topology = MeshTopology(nodes=(node,), devices=(device,))
     assert len(topology.nodes) == 1
     assert len(topology.devices) == 1
-
