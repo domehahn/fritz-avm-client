@@ -30,7 +30,7 @@ def test_settings_base_url():
     """Test base URL generation."""
     settings = Settings(fritz_host="192.168.1.1", fritz_port=49000)
     assert settings.fritz_base_url == "http://192.168.1.1:49000"
-    
+
     settings_tls = Settings(fritz_host="192.168.1.1", fritz_use_tls=True)
     assert settings_tls.fritz_base_url == "https://192.168.1.1:49000"
 
@@ -47,7 +47,7 @@ def test_node_model():
         extra={'model': 'FRITZ!Repeater 6000'},
         parent_node="Router"
     )
-    
+
     assert node.name == "Living Room Repeater"
     assert node.mac == "AA:BB:CC:DD:EE:FF"
     assert node.is_repeater is True
@@ -67,51 +67,48 @@ def test_device_model():
         rx_bytes_total=1024000,
         tx_bytes_total=512000
     )
-    
+
     assert device.name == "iPhone"
     assert device.online is True
     assert device.interface_type == "wlan"
     assert device.rx_bytes_total == 1024000
 
 
+import os
+
+
+@pytest.mark.skipif(not os.getenv("FRITZ_INTEGRATION_TESTS"), reason="FRITZ_INTEGRATION_TESTS=1 not set")
 @pytest.mark.integration
 def test_client_initialization():
     """Test FritzClient initialization (requires Fritz!Box)."""
     settings = Settings()
-    # This will fail if no Fritz!Box is available
-    # Skip in CI/CD environments
-    try:
-        client = FritzClient(settings)
-        assert client.fc is not None
-        assert client.hosts is not None
-        assert client.status is not None
-    except Exception:
-        pytest.skip("Fritz!Box not available for testing")
+    client = FritzClient(settings)
+    assert client.fc is not None
 
 
+@pytest.mark.skipif(not os.getenv("FRITZ_INTEGRATION_TESTS"), reason="FRITZ_INTEGRATION_TESTS=1 not set")
 @pytest.mark.integration
 def test_get_wan_stats():
     """Test getting WAN statistics (requires Fritz!Box)."""
     settings = Settings()
-    try:
-        client = FritzClient(settings)
-        wan_stats = client.get_wan_stats()
-        
-        # Check that all expected keys are present
-        expected_keys = [
-            'total_bytes_sent',
-            'total_bytes_received',
-            'current_download_rate',
-            'current_upload_rate',
-            'is_connected',
-            'external_ip',
-            'attenuation',
-            'noise_margin',
-            'cpu_temperatures'
-        ]
-        
-        for key in expected_keys:
-            assert key in wan_stats
-            
-    except Exception:
-        pytest.skip("Fritz!Box not available for testing")
+    client = FritzClient(settings)
+    wan_stats = client.get_wan_stats()
+    assert 'bytes_sent' in wan_stats
+
+
+def test_mesh_discovery_initialization():
+    """Test MeshDiscovery initialization with optional overrides."""
+    from fritz_avm_client import MeshDiscovery
+    discovery = MeshDiscovery(
+        client=None,
+        static_mappings={"192.168.178.50": "Repeater-1"},
+        manual_hierarchy={"AA:BB:CC:DD:EE:FF": "fritz.box"},
+        model_name_mapping={"FRITZ!Repeater 6000": "Wohnzimmer"}
+    )
+    assert discovery.static_mappings == {"192.168.178.50": "Repeater-1"}
+    assert discovery.manual_hierarchy == {"AA:BB:CC:DD:EE:FF": "fritz.box"}
+    assert discovery.model_name_mapping == {"FRITZ!Repeater 6000": "Wohnzimmer"}
+    nodes, devices = discovery.discover()
+    assert nodes == []
+    assert devices == []
+

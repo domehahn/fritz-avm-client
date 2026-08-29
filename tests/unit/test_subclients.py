@@ -1,0 +1,104 @@
+"""Unit tests for RouterClient, HostsClient, WlanClient, and CapabilityDetector with mocks."""
+import pytest
+from unittest.mock import MagicMock, patch
+
+from fritz_avm_client.router import RouterClient
+from fritz_avm_client.hosts import HostsClient
+from fritz_avm_client.wlan import WlanClient
+from fritz_avm_client.capabilities import CapabilityDetector
+from fritz_avm_client.exceptions import FritzTimeoutError, FritzConnectionError
+
+
+def test_router_client_get_wan_stats():
+    mock_fc = MagicMock()
+    with patch("fritz_avm_client.router.FritzStatus") as mock_status_cls:
+        mock_status = mock_status_cls.return_value
+        mock_status.bytes_received = 500000
+        mock_status.bytes_sent = 200000
+        mock_status.transmission_rate = (1000, 500)
+        mock_status.max_byte_rate = (12500000, 2500000)
+        mock_status.device_uptime = 3600
+        mock_status.connection_uptime = 3600
+        mock_status.external_ip = "203.0.113.1"
+        mock_status.is_connected = True
+        mock_status.attenuation = (10.0, 8.0)
+        mock_status.noise_margin = (15.0, 12.0)
+        mock_status.get_cpu_temperatures.return_value = [55.0, 60.0]
+
+        router = RouterClient(mock_fc)
+        wan = router.get_wan_stats()
+        dsl = router.get_dsl_stats()
+
+        assert wan.total_bytes_received == 500000
+        assert wan.total_bytes_sent == 200000
+        assert wan.current_download_rate == 1000
+        assert wan.external_ip == "203.0.113.1"
+        assert wan.cpu_temperatures == {'cpu0': 55.0, 'cpu1': 60.0}
+
+        assert dsl.downstream_attenuation == 10.0
+        assert dsl.upstream_attenuation == 8.0
+
+
+def test_hosts_client():
+    mock_fc = MagicMock()
+    with patch("fritz_avm_client.hosts.FritzHosts") as mock_hosts_cls:
+        mock_hosts = mock_hosts_cls.return_value
+        mock_hosts.get_hosts_info.return_value = [{'name': 'TV', 'mac': '00:11:22:33:44:55'}]
+
+        hosts_client = HostsClient(mock_fc)
+        all_hosts = hosts_client.get_all_hosts()
+        assert len(all_hosts) == 1
+        assert all_hosts[0]['name'] == 'TV'
+
+    mock_fc.call_action.return_value = {
+        'NewX_AVM-DE_RxBytes': 1000,
+        'NewX_AVM-DE_TxBytes': 2000,
+    }
+    stats = hosts_client.get_device_stats('00:11:22:33:44:55')
+    assert stats == {'rx_bytes': 1000, 'tx_bytes': 2000}
+
+
+def test_wlan_client():
+    mock_fc = MagicMock()
+    mock_fc.call_action.side_effect = lambda service, action, **kwargs: {
+        'GetStatistics': {'NewTotalPacketsSent': 100, 'NewTotalPacketsReceived': 200},
+        'GetTotalAssociations': {'NewTotalAssociations': 1},
+        'GetInfo': {'NewBSSID': 'AA:BB:CC:DD:EE:00'},
+        'GetGenericAssociatedDeviceInfo': {
+            'NewAssociatedDeviceMACAddress': '11:22:33:44:55:66',
+            'NewAssociatedDeviceIPAddress': '192.168.178.50',
+            'NewX_AVM-DE_SignalStrength': 90,
+            'NewX_AVM-DE_Speed': 300,
+        }
+    }.get(action, {})
+
+    wlan_client = WlanClient(mock_fc)
+    traffic = wlan_client.get_wlan_traffic_stats()
+    assert traffic.total_packets_sent == 400  # 4 bands * 100
+    assert traffic.total_packets_received == 800  # 4 bands * 200
+
+    devices = wlan_client.get_wlan_devices()
+    assert len(devices) == 4
+    assert devices[0]['device_mac'] == '11:22:33:44:55:66'
+
+
+def test_capability_detector():
+    mock_fc = MagicMock()
+    mock_fc.services = {
+        'Hosts1': None,
+        'DeviceInfo1': None,
+        'WANIPConnection1': None,
+        'WLANConfiguration1': None,
+    }
+    detector = CapabilityDetector()
+    caps = detector.detect(mock_fc)
+    assert caps.mesh is True
+    assert caps.cpu_temperature is True
+    assert caps.dsl_metrics is True
+    assert caps.wlan_statistics is True
+    assert caps.host_traffic_statistics is True
+
+    # Caching check
+    cached = detector.detect(mock_fc)
+    assert cached is caps
+
