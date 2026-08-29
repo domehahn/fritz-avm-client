@@ -3,6 +3,12 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import List, Tuple, Dict, Any, Optional, TYPE_CHECKING
 from .models import Node, Device
+from .exceptions import (
+    FritzError,
+    FritzTimeoutError,
+    FritzAuthenticationError,
+    FritzConnectionError,
+)
 
 if TYPE_CHECKING:
     from .client import FritzClient
@@ -416,6 +422,7 @@ class MeshDiscovery:
                 upper_name = name.upper()
                 host_mac_upper = (mac or "").upper()
                 mesh_mac_for_host = host_mac_to_mesh_mac.get(host_mac_upper, host_mac_upper)
+                mesh_type = type_by_mac.get(mesh_mac_for_host, {})
 
                 is_router = bool(mesh_type.get("is_router")) or (
                     upper_name.startswith("FRITZ.BOX") or upper_name == "FRITZ.BOX"
@@ -518,9 +525,7 @@ class MeshDiscovery:
                             connected_node_key, connected_node_key
                         )
 
-                    traffic_stats = (
-                        self.client.get_device_stats(mac) if mac else {"rx_bytes": 0, "tx_bytes": 0}
-                    )
+                    traffic_stats = self.client.get_device_stats(mac) if mac else None
 
                     extra_data = {"interface": interface_type, "mapping": mapping_source}
                     if mac_upper in device_mac_to_wlan_stats:
@@ -535,8 +540,8 @@ class MeshDiscovery:
                         is_active=active,
                         connection_type=interface_type,
                         connected_to=connected_node,
-                        rx_bytes=(traffic_stats or {}).get("rx_bytes", 0),
-                        tx_bytes=(traffic_stats or {}).get("tx_bytes", 0),
+                        rx_bytes=traffic_stats.get("rx_bytes") if traffic_stats else None,
+                        tx_bytes=traffic_stats.get("tx_bytes") if traffic_stats else None,
                         extra=extra_data,
                     )
                     devices.append(device)
@@ -558,10 +563,9 @@ class MeshDiscovery:
                             )
                 nodes.append(replace(node, parent_node=parent_name))
 
+        except (FritzTimeoutError, FritzAuthenticationError, FritzConnectionError, FritzError):
+            raise
         except Exception as e:
-            print(f"Error during discovery: {e}")
-            import traceback
-
-            traceback.print_exc()
+            raise FritzConnectionError(f"Error during mesh discovery: {e}") from e
 
         return nodes, devices

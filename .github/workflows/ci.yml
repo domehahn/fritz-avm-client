@@ -34,8 +34,8 @@ jobs:
 
       - name: Lint with ruff
         run: |
-          ruff check src/
-          ruff format --check src/
+          ruff check src/ tests/
+          ruff format --check src/ tests/
 
       - name: Type check with mypy
         run: |
@@ -43,7 +43,7 @@ jobs:
 
       - name: Run unit & contract tests with coverage
         run: |
-          PYTHONPATH=src pytest --cov=fritz_avm_client --cov-fail-under=80 tests/
+          PYTHONPATH=src pytest --cov=fritz_avm_client --cov-fail-under=90 tests/
 
       - name: Security scan with pip-audit
         run: |

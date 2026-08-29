@@ -42,12 +42,12 @@ class DslStats:
 class WlanStats:
     """Aggregated WiFi interface statistics."""
 
-    total_packets_sent: int = 0
-    total_packets_received: int = 0
+    total_packets_sent: Optional[int] = None
+    total_packets_received: Optional[int] = None
     service_index: int = 1
     ssid: Optional[str] = None
     channel: Optional[int] = None
-    connected_clients: int = 0
+    connected_clients: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -74,8 +74,8 @@ class Device:
     connected_to: Optional[str] = None
     connection_type: Optional[str] = None
     is_active: bool = False
-    rx_bytes: int = 0
-    tx_bytes: int = 0
+    rx_bytes: Optional[int] = None
+    tx_bytes: Optional[int] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
 

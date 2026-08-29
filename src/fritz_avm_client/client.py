@@ -77,6 +77,20 @@ class FritzClient:
             self._mesh_discovery = MeshDiscovery(self)
         return self._mesh_discovery
 
+    def __enter__(self) -> FritzClient:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Close connection resources if supported."""
+        if hasattr(self.fc, "close"):
+            try:
+                self.fc.close()
+            except Exception:
+                pass
+
     def _execute_with_retry(
         self, func: Callable[[], T], max_retries: int = 2, initial_backoff: float = 0.5
     ) -> T:
@@ -172,17 +186,22 @@ class FritzClient:
     def get_wlan_traffic_stats(self) -> Dict[str, Any]:
         """Get aggregated WLAN interface packet counts."""
         wlan_stats_list: List[WlanStats] = self._execute_with_retry(self.wlan_client.get_wlan_stats)
-        total_clients = (
-            sum(s.connected_clients for s in wlan_stats_list) if wlan_stats_list else None
-        )
+        clients_list = [
+            s.connected_clients for s in wlan_stats_list if s.connected_clients is not None
+        ]
+        sent_list = [
+            s.total_packets_sent for s in wlan_stats_list if s.total_packets_sent is not None
+        ]
+        recv_list = [
+            s.total_packets_received
+            for s in wlan_stats_list
+            if s.total_packets_received is not None
+        ]
+
         return {
-            "total_packets_sent": sum(s.total_packets_sent for s in wlan_stats_list)
-            if wlan_stats_list
-            else None,
-            "total_packets_received": sum(s.total_packets_received for s in wlan_stats_list)
-            if wlan_stats_list
-            else None,
-            "connected_clients": total_clients,
+            "total_packets_sent": sum(sent_list) if sent_list else None,
+            "total_packets_received": sum(recv_list) if recv_list else None,
+            "connected_clients": sum(clients_list) if clients_list else None,
         }
 
     def get_wlan_devices(self) -> List[Dict[str, Any]]:

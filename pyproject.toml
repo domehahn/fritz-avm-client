@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fritz-avm-client"
-version = "0.2.0"
+version = "0.3.0"
 description = "Extended Python client for AVM Fritz!Box routers with mesh topology, CPU temperatures, and advanced metrics"
 authors = [
     {name = "Dominik Hahn", email = "dominik@example.com"}
