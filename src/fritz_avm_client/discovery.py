@@ -1,4 +1,5 @@
 """Mesh network discovery for Fritz!Box."""
+
 from __future__ import annotations
 from dataclasses import replace
 from typing import List, Tuple, Dict, Any, Optional, TYPE_CHECKING
@@ -12,6 +13,31 @@ from .exceptions import (
 
 if TYPE_CHECKING:
     from .client import FritzClient
+
+# Keys in the mesh topology document whose value must be a list; some FRITZ!OS
+# versions emit JSON null instead, which breaks ``for x in ...`` downstream.
+_MESH_LIST_KEYS = frozenset(
+    {
+        "nodes",
+        "node_interfaces",
+        "node_links",
+        "ip_addresses",
+        "device_capabilities",
+        "enabled_device_capabilities",
+    }
+)
+
+
+def _coerce_null_lists(obj: Any) -> Any:
+    """Recursively replace ``None`` with ``[]`` for known list-valued mesh keys."""
+    if isinstance(obj, dict):
+        return {
+            k: ([] if (k in _MESH_LIST_KEYS and v is None) else _coerce_null_lists(v))
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_coerce_null_lists(v) for v in obj]
+    return obj
 
 
 class MeshDiscovery:
@@ -37,9 +63,9 @@ class MeshDiscovery:
     def __init__(
         self,
         client: FritzClient,
-        static_mappings: Optional[Dict[str, str]] = None,
-        manual_hierarchy: Optional[Dict[str, str]] = None,
-        model_name_mapping: Optional[Dict[str, str]] = None,
+        static_mappings: Optional[dict[str, str]] = None,
+        manual_hierarchy: Optional[dict[str, str]] = None,
+        model_name_mapping: Optional[dict[str, str]] = None,
     ):
         """Initialize mesh discovery.
 
@@ -57,7 +83,7 @@ class MeshDiscovery:
         self.manual_hierarchy = manual_hierarchy or {}
         self.model_name_mapping = model_name_mapping or {}
 
-    def discover(self) -> Tuple[List[Node], List[Device]]:
+    def discover(self) -> tuple[list[Node], list[Device]]:
         """Discover all mesh nodes and devices with their connections.
 
         Returns:
@@ -65,36 +91,48 @@ class MeshDiscovery:
                 - nodes: List of mesh infrastructure nodes
                 - devices: List of client devices with connection info
         """
-        nodes: List[Node] = []
-        devices: List[Device] = []
+        nodes: list[Node] = []
+        devices: list[Device] = []
 
         if not self.client:
             return nodes, devices
 
         try:
-            # 1. Get WLAN associations to map WiFi devices to their access points
-            wlan_devices = self.client.get_wlan_devices()
-            device_mac_to_ap_mac: Dict[str, str] = {}
-            device_mac_to_wlan_stats: Dict[str, Dict[str, Any]] = {}
+            # 1. Get WLAN associations for per-client signal / negotiated rate.
+            # fritzconnection's FritzWLAN.get_hosts_info() yields the keys
+            # 'mac', 'ip', 'signal', 'speed' (no 'device_mac'/'ap_mac'); accept
+            # either spelling and tolerate partial rows.
+            wlan_devices = self.client.get_wlan_devices() or []
+            device_mac_to_ap_mac: dict[str, str] = {}
+            device_mac_to_wlan_stats: dict[str, dict[str, Any]] = {}
             for wlan_dev in wlan_devices:
-                mac = wlan_dev["device_mac"].upper()
-                device_mac_to_ap_mac[mac] = wlan_dev["ap_mac"].upper()
+                if not isinstance(wlan_dev, dict):
+                    continue
+                raw_mac = wlan_dev.get("device_mac") or wlan_dev.get("mac") or ""
+                mac = raw_mac.upper()
+                if not mac:
+                    continue
+                ap_mac = wlan_dev.get("ap_mac")
+                if ap_mac:
+                    device_mac_to_ap_mac[mac] = ap_mac.upper()
                 device_mac_to_wlan_stats[mac] = {
-                    "signal_strength": wlan_dev.get("signal_strength", 0),
+                    "signal_strength": wlan_dev.get("signal_strength", wlan_dev.get("signal", 0)),
                     "speed": wlan_dev.get("speed", 0),
                 }
 
-            # 2. Get mesh topology
-            mesh_topology = self.client.get_mesh_info()
-            node_uid_to_name: Dict[str, str] = {}
-            mac_to_mesh_name: Dict[str, str] = {}
-            ap_mac_to_mesh_name: Dict[str, str] = {}
-            type_by_mac: Dict[str, Dict[str, bool]] = {}
-            node_mac_to_parent_name: Dict[str, str] = {}
-            node_uid_to_mac: Dict[str, str] = {}
-            node_mac_to_link_speeds: Dict[str, Dict[str, int]] = {}
-            mesh_mac_to_ip: Dict[str, str] = {}
-            device_ip_to_node_uid: Dict[str, str] = {}
+            # 2. Get mesh topology. get_mesh_info() may return list-valued
+            # fields as JSON null on some FRITZ!OS versions; coerce to [] so the
+            # parsing below never iterates None.
+            mesh_topology = _coerce_null_lists(self.client.get_mesh_info())
+            node_uid_to_name: dict[str, str] = {}
+            mac_to_mesh_name: dict[str, str] = {}
+            ap_mac_to_mesh_name: dict[str, str] = {}
+            type_by_mac: dict[str, dict[str, bool]] = {}
+            node_mac_to_parent_name: dict[str, str] = {}
+            node_uid_to_mac: dict[str, str] = {}
+            node_mac_to_link_speeds: dict[str, dict[str, int]] = {}
+            mesh_mac_to_ip: dict[str, str] = {}
+            device_ip_to_node_uid: dict[str, str] = {}
 
             if mesh_topology:
                 for node_info in mesh_topology.get("nodes", []):
@@ -203,8 +241,8 @@ class MeshDiscovery:
             # 4. Get all hosts for detailed device data
             all_hosts = self.client.get_all_hosts()
 
-            mesh_name_to_unique_name: Dict[str, str] = {}
-            mesh_name_to_mac: Dict[str, str] = {}
+            mesh_name_to_unique_name: dict[str, str] = {}
+            mesh_name_to_mac: dict[str, str] = {}
 
             if mesh_topology:
                 for node_info in mesh_topology.get("nodes", []):
@@ -251,9 +289,9 @@ class MeshDiscovery:
                         mesh_name_to_unique_name[mesh_name] = unique_name
                     mesh_name_to_unique_name[name] = unique_name
 
-            uid_to_unique_name: Dict[str, str] = {}
-            mac_to_unique_name: Dict[str, str] = {}
-            ip_to_host_info: Dict[str, Dict[str, str]] = {}
+            uid_to_unique_name: dict[str, str] = {}
+            mac_to_unique_name: dict[str, str] = {}
+            ip_to_host_info: dict[str, dict[str, str]] = {}
 
             for host in all_hosts:
                 ip = host.get("ip", "")
@@ -329,7 +367,7 @@ class MeshDiscovery:
                         if device_name:
                             mesh_name_to_unique_name[device_name] = unique_name
 
-            nodes_by_mac: Dict[str, Node] = {}
+            nodes_by_mac: dict[str, Node] = {}
 
             for mesh_name, mac_addr in mesh_name_to_mac.items():
                 if mesh_name not in mesh_name_to_unique_name:
@@ -382,7 +420,7 @@ class MeshDiscovery:
                     )
                     nodes_by_mac[mac_addr.upper()] = node
 
-            host_mac_to_mesh_mac: Dict[str, str] = {}
+            host_mac_to_mesh_mac: dict[str, str] = {}
             if mesh_topology:
                 for node_info in mesh_topology.get("nodes", []):
                     mesh_mac = node_info.get("device_mac_address", "").upper()

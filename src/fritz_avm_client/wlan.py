@@ -1,4 +1,5 @@
 """WLAN client for wireless access point and associated station statistics."""
+
 from __future__ import annotations
 from typing import List, Dict, Any, cast
 from fritzconnection.lib.fritzwlan import FritzWLAN
@@ -14,9 +15,9 @@ class WlanClient:
     def __init__(self, fc: Any) -> None:
         self.fc = fc
 
-    def get_wlan_stats(self) -> List[WlanStats]:
+    def get_wlan_stats(self) -> list[WlanStats]:
         """Get WLAN statistics across all available radio bands (2.4GHz, 5GHz, 6GHz)."""
-        stats_list: List[WlanStats] = []
+        stats_list: list[WlanStats] = []
         try:
             for i in range(1, 5):
                 try:
@@ -66,8 +67,14 @@ class WlanClient:
 
         return stats_list
 
-    def get_associated_devices(self, service_index: int = 1) -> List[Dict[str, Any]]:
-        """Get list of associated wireless stations for a given WLAN service index."""
+    def get_associated_devices(self, service_index: int = 1) -> list[dict[str, Any]]:
+        """Associated wireless stations for one WLAN service index.
+
+        Rows follow fritzconnection's ``FritzWLAN.get_hosts_info()`` shape:
+        ``service``, ``index``, ``status``, ``mac``, ``ip``, ``signal``,
+        ``speed``. Returns ``[]`` if the service is absent or access is
+        restricted.
+        """
         try:
             wlan = FritzWLAN(self.fc, service=service_index)
             devices = (
@@ -75,7 +82,7 @@ class WlanClient:
                 if hasattr(wlan, "get_associated_devices")
                 else (wlan.get_hosts_info() if hasattr(wlan, "get_hosts_info") else [])
             )
-            return cast(List[Dict[str, Any]], devices)
+            return cast(list[dict[str, Any]], devices or [])
         except TimeoutError as exc:
             raise FritzTimeoutError(
                 f"Timeout fetching associated devices for WLAN {service_index}: {exc}"
@@ -83,3 +90,34 @@ class WlanClient:
         except Exception:
             # Service not available, 401 restricted, or unsupported
             return []
+
+    def get_all_associated_devices(self, max_service_index: int = 4) -> list[dict[str, Any]]:
+        """Associated stations across every radio band (2.4/5/6 GHz + guest).
+
+        ``get_associated_devices(1)`` alone only sees the 2.4 GHz band. This
+        merges services ``1..max_service_index`` and de-duplicates by MAC,
+        keeping the row with the strongest signal.
+        """
+        best: dict[str, dict[str, Any]] = {}
+        for idx in range(1, max_service_index + 1):
+            rows = self.get_associated_devices(idx)
+            if not rows:
+                continue
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                mac = (
+                    row.get("mac")
+                    or row.get("device_mac")
+                    or row.get("MACAddress")
+                    or row.get("NewAssociatedDeviceMACAddress")
+                    or ""
+                ).upper()
+                if not mac:
+                    continue
+                sig = row.get("signal", row.get("signal_strength", 0)) or 0
+                prev = best.get(mac)
+                prev_sig = prev.get("signal", prev.get("signal_strength", 0)) or 0 if prev else -1
+                if prev is None or sig >= prev_sig:
+                    best[mac] = row
+        return list(best.values())

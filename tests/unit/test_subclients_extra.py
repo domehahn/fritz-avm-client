@@ -1,4 +1,5 @@
 """Extra unit tests for high coverage across subclients, facade, and discovery."""
+
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from fritzconnection.core.exceptions import FritzActionError
@@ -84,23 +85,30 @@ def test_client_facade_and_context_manager():
         assert client.get_device_stats("00:11:22:33:44:55") is None
 
         # get_all_hosts & get_wlan_devices
-        with patch.object(client.hosts_client, "get_hosts_info") as mock_gi, patch.object(
-            client.wlan_client, "get_associated_devices"
-        ) as mock_ad, patch.object(client.wlan_client, "get_wlan_stats") as mock_ws:
+        with (
+            patch.object(client.hosts_client, "get_hosts_info") as mock_gi,
+            patch.object(client.wlan_client, "get_associated_devices") as mock_ad,
+            patch.object(client.wlan_client, "get_wlan_stats") as mock_ws,
+        ):
             mock_gi.return_value = [{"name": "Device"}]
             assert client.get_all_hosts() == [{"name": "Device"}]
 
             mock_ws.return_value = [MagicMock(service_index=1)]
+            # FritzWLAN.get_hosts_info() shape: service/index/status/mac/ip/signal/speed
             mock_ad.return_value = [
                 {
-                    "MACAddress": "AA:BB:CC:DD:EE:FF",
-                    "NewX_AVM-DE_SignalStrength": 75,
-                    "NewX_AVM-DE_Speed": 300,
+                    "service": 1,
+                    "index": 0,
+                    "status": True,
+                    "mac": "AA:BB:CC:DD:EE:FF",
+                    "ip": "192.168.178.5",
+                    "signal": 75,
+                    "speed": 300,
                 }
             ]
             wlan_devs = client.get_wlan_devices()
             assert len(wlan_devs) == 1
-            assert wlan_devs[0]["MACAddress"] == "AA:BB:CC:DD:EE:FF"
+            assert wlan_devs[0]["mac"] == "AA:BB:CC:DD:EE:FF"
 
         # discover_mesh
         with patch.object(client.mesh_discovery, "discover") as mock_disc:
@@ -109,9 +117,10 @@ def test_client_facade_and_context_manager():
             assert len(mesh_topo.nodes) == 0
 
         # get_wan_stats
-        with patch.object(client.router_client, "get_wan_stats") as mock_wan, patch.object(
-            client.router_client, "get_dsl_stats"
-        ) as mock_dsl:
+        with (
+            patch.object(client.router_client, "get_wan_stats") as mock_wan,
+            patch.object(client.router_client, "get_dsl_stats") as mock_dsl,
+        ):
             mock_wan_obj = MagicMock()
             mock_wan_obj.total_bytes_sent = 1000
             mock_wan_obj.total_bytes_received = 2000

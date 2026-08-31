@@ -1,7 +1,13 @@
 """Fritz!Box AVM Client Package."""
+
 from __future__ import annotations
 from .config import Settings
-from .capabilities import FritzCapabilities, CapabilityDetector
+from .capabilities import (
+    FritzCapabilities,
+    CapabilityDetector,
+    PermissionReport,
+    probe_permissions,
+)
 from .exceptions import (
     FritzError,
     FritzConfigurationError,
@@ -32,6 +38,8 @@ __all__ = [
     "Settings",
     "FritzCapabilities",
     "CapabilityDetector",
+    "PermissionReport",
+    "probe_permissions",
     "FritzError",
     "FritzConfigurationError",
     "FritzConnectionError",

@@ -1,17 +1,19 @@
 """Fritz!Box client facade with retry logic and modular sub-clients."""
+
 from __future__ import annotations
 import time
 import random
-from typing import Dict, Any, List, Optional, Callable, TypeVar, cast
+from typing import Dict, Any, List, Optional, TypeVar, cast
+from collections.abc import Callable
 from fritzconnection import FritzConnection
 
 from .config import Settings
-from .capabilities import CapabilityDetector, FritzCapabilities
+from .capabilities import CapabilityDetector, FritzCapabilities, PermissionReport
 from .router import RouterClient
 from .hosts import HostsClient
 from .wlan import WlanClient
 from .admin import AdminClient
-from .discovery import MeshDiscovery
+from .discovery import MeshDiscovery, _coerce_null_lists
 from .models import WanStats, DslStats, WlanStats, MeshTopology
 from .exceptions import (
     FritzConfigurationError,
@@ -116,20 +118,24 @@ class FritzClient:
         """Get detected device capabilities."""
         return self.capabilities
 
-    def get_all_hosts(self) -> List[Dict[str, Any]]:
+    def get_all_hosts(self) -> list[dict[str, Any]]:
         """Get all host entries from Fritz!Box hosts table."""
-        res: List[Dict[str, Any]] = self._execute_with_retry(self.hosts_client.get_hosts_info)
+        res: list[dict[str, Any]] = self._execute_with_retry(self.hosts_client.get_hosts_info)
         return res
 
-    def get_mesh_info(self) -> Optional[Dict[str, Any]]:
-        """Get raw mesh topology information."""
+    def get_mesh_info(self) -> Optional[dict[str, Any]]:
+        """Get raw mesh topology information.
+
+        List-valued fields that some FRITZ!OS versions return as JSON ``null``
+        are coerced to ``[]`` so callers can iterate safely.
+        """
         try:
             res = self.hosts_client.hosts.get_mesh_topology()
-            return cast(Optional[Dict[str, Any]], res)
+            return cast(Optional[dict[str, Any]], _coerce_null_lists(res))
         except Exception:
             return None
 
-    def get_device_stats(self, mac_address: str) -> Optional[Dict[str, int]]:
+    def get_device_stats(self, mac_address: str) -> Optional[dict[str, int]]:
         """Get traffic statistics for a specific MAC address or None if unavailable.
 
         Does NOT return fake 0 values when data is unknown or unsupported.
@@ -145,7 +151,7 @@ class FritzClient:
             pass
         return None
 
-    def get_wan_stats(self) -> Dict[str, Any]:
+    def get_wan_stats(self) -> dict[str, Any]:
         """Get WAN statistics preserving None values for missing metrics."""
         stats: WanStats = self._execute_with_retry(self.router_client.get_wan_stats)
         dsl: DslStats = self.router_client.get_dsl_stats()
@@ -179,13 +185,13 @@ class FritzClient:
         """Get WAN statistics as a typed WanStats domain model."""
         return self._execute_with_retry(self.router_client.get_wan_stats)
 
-    def get_cpu_temperatures(self) -> Dict[str, float]:
+    def get_cpu_temperatures(self) -> dict[str, float]:
         """Get CPU temperatures dict."""
         return self.router_client.get_cpu_temperatures()
 
-    def get_wlan_traffic_stats(self) -> Dict[str, Any]:
+    def get_wlan_traffic_stats(self) -> dict[str, Any]:
         """Get aggregated WLAN interface packet counts."""
-        wlan_stats_list: List[WlanStats] = self._execute_with_retry(self.wlan_client.get_wlan_stats)
+        wlan_stats_list: list[WlanStats] = self._execute_with_retry(self.wlan_client.get_wlan_stats)
         clients_list = [
             s.connected_clients for s in wlan_stats_list if s.connected_clients is not None
         ]
@@ -204,9 +210,21 @@ class FritzClient:
             "connected_clients": sum(clients_list) if clients_list else None,
         }
 
-    def get_wlan_devices(self) -> List[Dict[str, Any]]:
-        """Get associated WLAN devices list."""
-        return self.wlan_client.get_associated_devices(1)
+    def get_wlan_devices(self) -> list[dict[str, Any]]:
+        """Associated WLAN stations across all radio bands (not just 2.4 GHz)."""
+        return self.wlan_client.get_all_associated_devices()
+
+    def probe_capabilities(self) -> PermissionReport:
+        """Actively test the permission-gated TR-064 actions once.
+
+        The SCPD-based :class:`CapabilityDetector` only reports whether a
+        *service* exists, not whether the logged-in user may call a given
+        *action*. A least-privilege FRITZ!Box account gets ``401`` for the
+        actions backing mesh topology, per-client Wi-Fi and the device log.
+        """
+        from .capabilities import probe_permissions
+
+        return probe_permissions(self.fc.call_action)
 
     def discover_mesh(self) -> MeshTopology:
         """Discover mesh topology returning typed MeshTopology (nodes, devices)."""
