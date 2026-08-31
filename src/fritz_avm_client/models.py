@@ -1,4 +1,5 @@
 """Typed domain models for Fritz!Box mesh topology, WAN stats, and devices."""
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Tuple
@@ -8,7 +9,7 @@ from typing import Optional, Dict, Any, Tuple
 class CpuTemperature:
     """Represents CPU temperature readings."""
 
-    temperatures: Dict[str, float] = field(default_factory=dict)
+    temperatures: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -25,7 +26,7 @@ class WanStats:
     connection_uptime: Optional[int] = None
     external_ip: Optional[str] = None
     is_connected: Optional[bool] = None
-    cpu_temperatures: Dict[str, float] = field(default_factory=dict)
+    cpu_temperatures: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -60,8 +61,29 @@ class Node:
     is_router: bool = False
     is_repeater: bool = False
     is_powerline: bool = False
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
     parent_node: Optional[str] = None
+
+    #: Placeholder names the FRITZ!Box assigns to unconfigured or transient mesh
+    #: entries. Such nodes flap in and out of the mesh list and should usually be
+    #: ignored by monitoring / topology views.
+    _PLACEHOLDER_NAMES = frozenset({"", "fritz.box", "fritz.repeater", "fritz.powerline"})
+
+    @property
+    def kind(self) -> str:
+        """Node role: ``router`` | ``repeater`` | ``powerline`` | ``unknown``."""
+        if self.is_router:
+            return "router"
+        if self.is_powerline:
+            return "powerline"
+        if self.is_repeater:
+            return "repeater"
+        return "unknown"
+
+    @property
+    def is_placeholder(self) -> bool:
+        """True for an unconfigured / transient mesh entry (not the router)."""
+        return not self.is_router and (self.name or "").strip().lower() in self._PLACEHOLDER_NAMES
 
 
 @dataclass(frozen=True)
@@ -76,12 +98,12 @@ class Device:
     is_active: bool = False
     rx_bytes: Optional[int] = None
     tx_bytes: Optional[int] = None
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class MeshTopology:
     """Complete mesh network topology snapshot."""
 
-    nodes: Tuple[Node, ...] = field(default_factory=tuple)
-    devices: Tuple[Device, ...] = field(default_factory=tuple)
+    nodes: tuple[Node, ...] = field(default_factory=tuple)
+    devices: tuple[Device, ...] = field(default_factory=tuple)
